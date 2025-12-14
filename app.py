@@ -4,7 +4,7 @@ import random
 
 # --- CONFIGURATION ---
 # Replace this with your Google Sheet URL from Step 1
-SHEET_URL = https://docs.google.com/spreadsheets/d/1faVJ-Cf7o6b-29KeGOkV9PsK9OptUjXDtJxkg5G7YAQ/edit?usp=sharing
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1faVJ-Cf7o6b-29KeGOkV9PsK9OptUjXDtJxkg5G7YAQ/edit?usp=sharing"
 ADMIN_PASSWORD = "teach"  # Password for you to see the dashboard
 
 st.set_page_config(page_title="LSH Change Sim", layout="wide")
