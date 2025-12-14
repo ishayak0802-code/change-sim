@@ -1,243 +1,201 @@
 import streamlit as st
 import pandas as pd
-import random
+from datetime import datetime
 
 # --- CONFIGURATION ---
-# Replace this with your Google Sheet URL from Step 1
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1faVJ-Cf7o6b-29KeGOkV9PsK9OptUjXDtJxkg5G7YAQ/edit?usp=sharing"
-ADMIN_PASSWORD = "teach"  # Password for you to see the dashboard
+# PASTE YOUR GOOGLE SHEET URL HERE
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1faVJ-Cf7o6b-29KeGOkV9PsK9OptUjXDtJxkg5G7YAQ/edit?usp=sharing" 
+ADMIN_PASSWORD = "admin"
 
-st.set_page_config(page_title="LSH Change Sim", layout="wide")
+# --- SETUP & STYLING ---
+st.set_page_config(page_title="LSH Change Simulation", layout="wide", page_icon="🛒")
 
-# --- HELPER FUNCTIONS ---
-def get_data():
-    """Reads the Google Sheet data for the Master View"""
+# Helper to load data (Read-Only for Master View)
+def load_data():
     try:
-        # Trick to read Google Sheet as CSV
         csv_url = SHEET_URL.replace('/edit?usp=sharing', '/export?format=csv')
         return pd.read_csv(csv_url)
     except:
-        return pd.DataFrame(columns=["Team", "Round", "Budget", "Morale", "ROI", "Last_Decision"])
+        return pd.DataFrame(columns=["Timestamp", "Team", "Round", "Decision", "Cost"])
 
-# --- SIDEBAR LOGIN ---
+# --- SIDEBAR: LOGIN & ROLE SELECTOR ---
 with st.sidebar:
-    st.image("https://via.placeholder.com/150", caption="Ludowa Sieć Handlowa") # You can replace with LSH logo URL
-    st.title("🛒 LSH Sim 2020")
-    
-    user_type = st.radio("Login As:", ["Student Team", "Professor"])
-    
-    if user_type == "Student Team":
-        team_name = st.text_input("Enter Team Name (e.g., Team Alpha)")
-        if st.button("Reset / Restart"):
-            st.session_state.clear()
-            st.rerun()
-    else:
-        pwd = st.text_input("Admin Password", type="password")
-        team_name = "ADMIN"
-
-# --- MASTER VIEW (PROFESSOR) ---
-if user_type == "Professor":
-    if pwd == ADMIN_PASSWORD:
-        st.header("👨‍🏫 Master Dashboard: Real-Time Results")
-        if st.button("Refresh Data"):
-            st.rerun()
-        
-        # In a real deployed app with a database, this would pull live data. 
-        # For this simulation without a complex DB setup, we will view the concepts.
-        st.info("In the fully deployed version, this table shows live student inputs from the connected database.")
-        
-        # Simulation of what you would see:
-        dummy_data = pd.DataFrame({
-            "Team": ["Team Alpha", "Team Beta", "Team Gamma"],
-            "Round": ["Refreeze", "Change", "Unfreeze"],
-            "Budget Rem": ["250,000", "800,000", "950,000"],
-            "Morale": ["Low (Crisis)", "High", "Neutral"],
-            "Strategy": ["Big Bang", "Phased", "Pending"]
-        })
-        st.dataframe(dummy_data, use_container_width=True)
-        
-        st.subheader("Class Discussion Prompts")
-        st.markdown("""
-        * **For Teams with Low Morale:** "Why did the 'Big Bang' approach cause panic in your workforce?" (Link to *Lewin's Unfreeze*)
-        * **For Teams with High Costs:** "Was the expensive training worth the ROI?" (Link to *ADKAR Ability*)
-        """)
-    else:
-        st.error("Incorrect Password")
-    st.stop()
-
-# --- STUDENT SIMULATION LOGIC ---
-
-if not team_name:
-    st.warning("Please enter a Team Name in the sidebar to begin.")
-    st.stop()
-
-# Initialize State (LSH Context 2020)
-if 'round' not in st.session_state:
-    st.session_state['round'] = 1
-    st.session_state['budget'] = 1000000  # 1 Million Zloty [cite: 47]
-    st.session_state['morale'] = 60       # Base morale
-    st.session_state['roi'] = 0           # Projected ROI
-    st.session_state['adoption'] = 0
-    st.session_state['history'] = []
-
-# METRICS DISPLAY
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Budget (Zloty)", f"{st.session_state['budget']:,}")
-col2.metric("Staff Morale", f"{st.session_state['morale']}/100")
-col3.metric("Adoption %", f"{st.session_state['adoption']}%")
-col4.metric("Current Round", st.session_state['round'])
-
-# --- ROUND 1: UNFREEZE (Strategy) ---
-if st.session_state['round'] == 1:
-    st.header("Round 1: Strategy & Unfreezing")
-    st.markdown("""
-    **Context:** It is 2020. LSH has 2000 stores. You have 1M Zloty. 
-    Foreign competitors (Lidl/Aldi) are pressuring you. You must modernize. [cite: 480]
-    
-    **Theory (Kotter):** You must establish a sense of urgency without creating panic.
-    """)
-    
-    st.subheader("Decision 1: The Rollout Strategy ")
-    rollout = st.radio("Choose your approach:", [
-        "A. One-Time 'Big Bang' (All 2000 stores in 6 months)",
-        "B. Two-Phase Rollout (500 stores now, 1500 later)"
+    st.image("https://via.placeholder.com/150?text=LSH+Logo", use_container_width=True)
+    st.header("Login")
+    role = st.selectbox("Select Your Role:", [
+        "Select...",
+        "Professor (Master View)",
+        "Team 1: Business & Procurement",
+        "Team 2: IT",
+        "Team 3: Operations",
+        "Team 4: Legal",
+        "Team 5: HR & Training",
+        "Team 6: Transformation Office",
+        "Team 7: Corp Communications"
     ])
     
-    st.subheader("Decision 2: Vendor Selection [cite: 460]")
-    vendor = st.radio("Select Vendor:", [
-        "A. Single Vendor (300k Zloty - Fast, Rigid)",
-        "B. Multi-Vendor (400k Zloty - Flexible, Complex)"
-    ])
-    
-    if st.button("Submit Round 1"):
-        # Calc Impacts
-        cost = 0
-        if "Big Bang" in rollout:
-            cost += 0 # Operational strain hidden cost
-            st.session_state['morale'] -= 15 # High panic
-            st.session_state['roi'] += 20    # Faster ROI
-            msg = "Result: The 'Big Bang' created panic! Morale dropped, but financial projections look good."
-        else:
-            st.session_state['morale'] += 5  # Staff feels safer
-            st.session_state['roi'] -= 10    # Slower ROI
-            msg = "Result: Phased approach calmed the staff. Slower financial returns."
+    if role == "Professor (Master View)":
+        pwd = st.text_input("Password", type="password")
+        if pwd != ADMIN_PASSWORD:
+            st.warning("Incorrect Password")
+            st.stop()
 
-        if "Single" in vendor:
-            cost += 300000
-        else:
-            cost += 400000
-            
-        st.session_state['budget'] -= cost
-        st.session_state['history'].append(f"R1: {rollout} | {vendor}")
-        st.success(msg)
-        st.session_state['round'] = 2
+# --- PART 1: PROFESSOR MASTER VIEW ---
+if role == "Professor (Master View)":
+    st.title("👨‍🏫 Classroom Control Center")
+    
+    if st.button("🔄 Refresh Live Data"):
         st.rerun()
-
-# --- ROUND 2: CHANGE (Execution) ---
-elif st.session_state['round'] == 2:
-    st.header("Round 2: The Implementation (Change)")
-    st.markdown("""
-    **Context:** Machines are arriving. Staff fears job losses. [cite: 322]
-    
-    **Theory (Lewin - Movement):** You need to support the change with training and remove obstacles (accessibility).
-    """)
-    
-    st.subheader("Decision 3: Training Strategy ")
-    training = st.radio("How will you train 25,000 employees?", [
-        "A. Online Modules (Cost: 75k Zloty - Low Engagement)",
-        "B. Comprehensive On-Site (Cost: 125k Zloty - High Competency)"
-    ])
-    
-    st.subheader("Decision 4: Accessibility Compliance ")
-    access = st.radio("Legal Check - Accessibility Law X:", [
-        "A. Minimum Compliance (Cost: 20k Zloty - Risk of Fines)",
-        "B. High-End Compliance (Cost: 50k Zloty - No Risk)"
-    ])
-    
-    if st.button("Submit Round 2"):
-        cost = 0
         
-        # Training Logic
-        if "Online" in training:
-            cost += 75000
-            st.session_state['morale'] -= 10
-            st.session_state['adoption'] += 20
-            st.warning("Staff are confused by the online videos. Adoption is slow.")
-        else:
-            cost += 125000
-            st.session_state['morale'] += 10
-            st.session_state['adoption'] += 50
-            st.success("On-site training was a hit! Staff feel confident.")
+    df = load_data()
+    
+    # Dashboard Metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Active Teams", df['Team'].nunique())
+    col2.metric("Total Decisions Made", len(df))
+    col3.metric("Total Budget Committed", f"{df['Cost'].sum():,} PLN")
+    
+    st.divider()
+    
+    # Pivot View: Teams vs Decisions
+    st.subheader("Live Decision Matrix")
+    st.dataframe(df.sort_values(by="Timestamp", ascending=False), use_container_width=True)
+    
+    st.subheader("Discussion Triggers")
+    st.info("💡 **Teaching Tip:** If Team 2 (IT) chose 'In-House Development' but Team 1 (Business) chose 'Single Vendor Package', pause the class! These decisions conflict.")
 
-        # Accessibility Logic
-        if "Minimum" in access:
-            cost += 20000
-            # Hidden risk flag for Round 3
-            st.session_state['risk_flag'] = True
-        else:
-            cost += 50000
-            st.session_state['risk_flag'] = False
-            
-        st.session_state['budget'] -= cost
-        st.session_state['history'].append(f"R2: {training} | {access}")
-        st.session_state['round'] = 3
-        st.rerun()
-
-# --- ROUND 3: REFREEZE (Scenarios) ---
-elif st.session_state['round'] == 3:
-    st.header("Round 3: Emerging Scenarios (Refreeze)")
-    st.markdown("""
-    **Theory (ADKAR - Reinforcement):** To make change stick, you must solve immediate problems effectively.
-    """)
-    
-    # Scenario Generation
-    scenario = random.choice(["Data Breach", "Vendor Delay", "Accessibility Complaint"])
-    
-    # Force Accessibility Complaint if they chose Minimum Compliance
-    if st.session_state.get('risk_flag') == True:
-        scenario = "Accessibility Complaint"
-        
-    st.error(f"ALERT: {scenario} Detected!")
-    
-    if scenario == "Data Breach":
-        st.write("Description: A customer reports unauthorized charges. GDPR violation risk. [cite: 103]")
-        choice = st.radio("Response:", ["A. Pause Rollout (Safety first)", "B. Ignore & Patch later"])
-    elif scenario == "Vendor Delay":
-        st.write("Description: Hardware is 2 months late. [cite: 86]")
-        choice = st.radio("Response:", ["A. Wait (Idle resources)", "B. Switch Vendor (High Cost)"])
-    elif scenario == "Accessibility Complaint":
-        st.write("Description: Customers with disabilities threaten lawsuit. [cite: 96]")
-        st.write("Note: This happened because of Low Compliance choice in R2.")
-        choice = st.radio("Response:", ["A. Retrofit Immediately (Expensive)", "B. Fight in Court"])
-
-    if st.button("Finalize Simulation"):
-        # Apply penalties based on scenario
-        if scenario == "Accessibility Complaint":
-            st.session_state['budget'] -= 100000 # Fine + Retrofit cost
-            st.session_state['morale'] -= 20
-        elif scenario == "Data Breach" and "Pause" in choice:
-            st.session_state['roi'] -= 10
-            st.session_state['morale'] += 5 # Staff appreciates safety
-        
-        st.session_state['round'] = 4
-        st.rerun()
-
-# --- RESULTS SUMMARY ---
-elif st.session_state['round'] == 4:
-    st.header("🏁 Simulation Complete")
-    
-    final_score = st.session_state['roi'] + st.session_state['adoption'] + (st.session_state['morale']/2)
-    
-    if st.session_state['budget'] < 0:
-        st.error(f"BANKRUPT: You overspent by {-st.session_state['budget']} Zloty.")
-    else:
-        st.success(f"Final Budget Remaining: {st.session_state['budget']:,} Zloty")
-    
-    st.metric("Final Change Effectiveness Score", f"{final_score:.0f}/200")
-    
-    st.subheader("Your Decision Path")
-    for step in st.session_state['history']:
-        st.text(step)
-        
+# --- PART 2: STUDENT TEAM VIEWS ---
+elif role != "Select...":
+    st.title(f"🛒 {role}")
     st.markdown("---")
-    st.info("Take a screenshot of this page for your professor.")
+    
+    # Initialize Session State for Students
+    if 'submitted' not in st.session_state:
+        st.session_state['submitted'] = False
+
+    # --- TEAM SPECIFIC LOGIC ---
+    
+    # TEAM 1: BUSINESS [Source: 425]
+    if "Team 1" in role:
+        st.info("**Mission:** Allocate the 1M PLN budget and decide on the vendor strategy.")
+        st.subheader("Decision 1: Vendor Strategy")
+        q1 = st.radio("Choose approach:", [
+            "Single Vendor (Cost: 300k, Fast but Rigid) [cite: 433]",
+            "Multiple Vendors (Cost: 400k, Flexible but Complex) [cite: 434]"
+        ])
+        st.subheader("Decision 2: Budget Allocation")
+        q2 = st.radio("Primary Budget Focus:", [
+            "Heavy IT & Ops (Technical Stability)",
+            "Heavy HR & Training (Adoption Focus)"
+        ])
+        cost = 300000 if "Single" in q1 else 400000
+
+    # TEAM 2: IT [Source: 53]
+    elif "Team 2" in role:
+        st.info("**Mission:** Ensure software readiness and integration with legacy POS.")
+        st.subheader("Decision 1: Development Approach")
+        q1 = st.radio("Choose Strategy:", [
+            "Off-the-Shelf (150k + 50k/yr, Ready in 3mo, Low Customization) [cite: 65]",
+            "In-House Dev (300k, 6mo, High Integration) [cite: 66]"
+        ])
+        st.subheader("Decision 2: Testing Strategy")
+        q2 = st.radio("Choose Strategy:", [
+            "Extensive Testing (50k, Adds 2mo, Low Risk) [cite: 69]",
+            "Minimal Testing (0k, Fast, High Risk) [cite: 70]"
+        ])
+        cost = (150000 if "Off-the-Shelf" in q1 else 300000) + (50000 if "Extensive" in q2 else 0)
+
+    # TEAM 3: OPERATIONS [Source: 145]
+    elif "Team 3" in role:
+        st.info("**Mission:** Manage physical installation in 2000 stores.")
+        st.subheader("Decision 1: Store Prioritization")
+        q1 = st.radio("Sequence:", [
+            "High-Revenue Stores First (Faster ROI, neglects small stores) [cite: 161]",
+            "Even Distribution (Equitable, Slower ROI) [cite: 162]"
+        ])
+        st.subheader("Decision 2: Installation Timeline")
+        q2 = st.radio("Approach:", [
+            "One-Time Rollout (6mo, High Disruption Risk) [cite: 154]",
+            "Phased Rollout (Phase 1 in 3mo, Phase 2 in 6mo) [cite: 154]"
+        ])
+        cost = 200000  # Base logic from docs
+
+    # TEAM 4: LEGAL [Source: 271]
+    elif "Team 4" in role:
+        st.info("**Mission:** Manage GDPR and Accessibility Law X compliance.")
+        st.subheader("Decision 1: Accessibility Compliance")
+        q1 = st.radio("Level of Compliance:", [
+            "High-End Compliance (50k, Zero Risk) [cite: 283]",
+            "Minimum Compliance (20k, Risk of 500k Fine) [cite: 284]"
+        ])
+        st.subheader("Decision 2: Vendor Contracts")
+        q2 = st.radio("Contract Type:", [
+            "Standard (Free, Low protection) [cite: 287]",
+            "Comprehensive (10k, High protection) [cite: 288]"
+        ])
+        cost = (50000 if "High-End" in q1 else 20000) + (10000 if "Comprehensive" in q2 else 0)
+
+    # TEAM 5: HR [Source: 103]
+    elif "Team 5" in role:
+        st.info("**Mission:** Manage workforce transition and 30% resistance rate.")
+        st.subheader("Decision 1: Transition Plan")
+        q1 = st.radio("Strategy:", [
+            "Redeployment to Service Roles (100k, Retains Staff) [cite: 115]",
+            "Severance Packages (200k, Lowers Morale) [cite: 116]"
+        ])
+        st.subheader("Decision 2: Training Strategy")
+        q2 = st.radio("Format:", [
+            "Comprehensive On-Site (125k, High Competency) [cite: 119]",
+            "Online Modules (75k, Lower Engagement) [cite: 120]"
+        ])
+        cost = (100000 if "Redeployment" in q1 else 200000) + (125000 if "On-Site" in q2 else 75000)
+
+    # TEAM 6: TRANSFORMATION (Risk) [Derived from Source 46, 510]
+    elif "Team 6" in role:
+        st.info("**Mission:** Risk Management and Contingency Planning.")
+        st.subheader("Decision 1: Contingency Fund")
+        q1 = st.radio("Allocation:", [
+            "Secure 10% of Budget for Unknowns (Safe)",
+            "Maximize Operational Spend (Risky)"
+        ])
+        st.subheader("Decision 2: Scenario Planning")
+        q2 = st.radio("Primary Fear:", [
+            "Vendor Delays [cite: 511]",
+            "Data Breach [cite: 528]"
+        ])
+        cost = 0
+
+    # TEAM 7: COMMS (PR) [Derived from Source 122]
+    elif "Team 7" in role:
+        st.info("**Mission:** Manage Internal and External messaging.")
+        st.subheader("Decision 1: Internal Message")
+        q1 = st.radio("Tone:", [
+            "Transparent: 'Jobs will change.' (Trust)",
+            "Reassuring: 'No one loses a job.' (Risky if untrue)"
+        ])
+        st.subheader("Decision 2: Customer Launch")
+        q2 = st.radio("Campaign:", [
+            "Digital Only (Low Cost)",
+            "In-Store Ambassadors (High Cost/High Adoption)"
+        ])
+        cost = 10000 # Estimated
+
+    # --- SUBMIT LOGIC ---
+    st.divider()
+    if st.button("Submit Decisions"):
+        # In a real app, this uses GSheet API. For this demo, we simulate success.
+        # To make this actually write to the sheet, you need the Google API setup.
+        # Since you are non-coder, we will display the instruction:
+        
+        st.success("Decisions Submitted to Professor!")
+        st.write(f"**Log:** {role} selected '{q1}' and '{q2}'. Cost: {cost}")
+        st.info("📝 *Note for Professor: To make this write to the real Sheet automatically, you need to enable the Google Drive API. For now, students can screenshot this page.*")
+        
+        # Display Change Management Insight
+        st.markdown("### 🧠 Change Management Concept")
+        if "Team 1" in role or "Team 3" in role:
+            st.write("**Theory: Lewin's Force Field Analysis.** You are deciding on the 'Driving Forces' (Efficiency, ROI) vs 'Restraining Forces' (Cost, Complexity).")
+        elif "Team 5" in role or "Team 7" in role:
+            st.write("**Theory: ADKAR Model (Awareness/Desire).** Your decisions directly impact the 'People' side of change. Cheap training fails to build 'Ability'.")
+        elif "Team 4" in role or "Team 6" in role:
+            st.write("**Theory: Kotter's Risk Analysis.** Ignoring barriers (like accessibility) allows complacency, which can derail the 'Refreezing' stage.")
